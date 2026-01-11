@@ -1,0 +1,7 @@
+{
+  "name": "Munawar Photo Angle Generator AI",
+  "description": "Generates 5 realistic camera angles from a single image.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
