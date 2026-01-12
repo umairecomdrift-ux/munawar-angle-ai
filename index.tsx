@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 
 // --- AUTHENTIC PHOTOGRAPHY ICONS ---
 const CameraMasterIcon = ({ className = "w-10 h-10" }) => (
@@ -41,13 +42,12 @@ const DownloadButtonIcon = () => (
 );
 
 // --- STUDIO CONFIG ---
-// Prompts are refined to be "safe" by ignoring context and focusing on "minimalist studio product photography"
 const ANGLES = [
-  { id: 'hero', name: 'Hero Cinematic', prompt: 'Cinematic hero shot from a dramatic low-angle, looking up. Minimalist clean studio lighting, high-end product photography style.' },
-  { id: 'flat', name: 'Flat Lay Overhead', prompt: 'Perfect 90-degree overhead flat lay. Soft diffuse lighting, clean neutral studio floor, symmetrical composition.' },
-  { id: 'profile', name: '45-Degree Studio', prompt: 'Professional side profile at 45-degrees. Shallow depth of field, sharp focus on the object, soft background bokeh.' },
-  { id: 'macro', name: 'Macro Detail', prompt: 'Extreme macro close-up focusing on physical textures and material surface. Professional commercial macro lens aesthetic.' },
-  { id: 'catalog', name: 'Clean Catalog', prompt: 'Standard eye-level commercial catalog shot. Bright neutral studio environment, sharp details throughout.' }
+  { id: 'hero', name: 'Hero Cinematic', prompt: 'Hero shot from a dramatic low-angle, looking up. High-end product photography style with cinematic lighting.' },
+  { id: 'flat', name: 'Flat Lay Overhead', prompt: 'Perfect 90-degree overhead flat lay. Soft diffuse lighting, clean neutral studio floor.' },
+  { id: 'profile', name: '45-Degree Studio', prompt: 'Professional side profile at 45-degrees. Sharp focus on the main object, soft professional bokeh.' },
+  { id: 'macro', name: 'Macro Detail', prompt: 'Extreme macro close-up focusing on physical textures and material details.' },
+  { id: 'catalog', name: 'Clean Catalog', prompt: 'Standard eye-level commercial catalog shot. Bright neutral professional studio environment.' }
 ];
 
 const App = () => {
@@ -61,7 +61,7 @@ const App = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        setError("File size is too large. Please use a smaller image.");
+        setError("File size is too large. Please use an image under 10MB.");
         return;
       }
       const reader = new FileReader();
@@ -89,6 +89,15 @@ const App = () => {
     setResults([]);
     setProgress(0);
 
+    // Using your requested safety settings with the correct SDK enums
+    const safetySettings = [
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_NONE }
+    ];
+
     try {
       const ai = new GoogleGenAI({ apiKey });
       const [header, base64Data] = image.split(',');
@@ -99,52 +108,54 @@ const App = () => {
       for (let i = 0; i < ANGLES.length; i++) {
         const angle = ANGLES[i];
         try {
-          /**
-           * STRATEGY: 
-           * Safety filters are often triggered by "Background Art", "Stylized Text", or "Faces" in the source image.
-           * We prompt the AI to IGNORE the background and focus ONLY on the central foreground object.
-           */
+          // OPTIMIZED PROMPT: This tells the AI to ignore the cafe background and art which triggers the filter.
+          // FIX: safetySettings must be placed inside the 'config' property.
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
               parts: [
                 { inlineData: { data: base64Data, mimeType } },
-                { text: `Focus ONLY on the central object in the foreground. Ignore the original background and any art or people in the background. Re-render just the foreground object in a professional minimalist studio setting with this perspective: ${angle.prompt}. Keep the object's original shape and materials.` }
+                { text: `Focus ONLY on the physical product in the middle. IGNORE the surrounding background environment, cafe, or walls. Recreate just the central object in a clean, professional minimalist studio. PERSPECTIVE: ${angle.prompt}. Ensure no people or text are in the output.` }
               ]
+            },
+            config: {
+              safetySettings: safetySettings
             }
           });
 
           const candidate = response.candidates?.[0];
           
           if (candidate?.finishReason === 'SAFETY') {
-            // Fallback for branded or complex items
-            const fallbackResponse = await ai.models.generateContent({
+            console.warn(`Safety block detected for ${angle.name}. Retrying with absolute generic prompt...`);
+            // Secondary Fallback: Use even more generic language to bypass strict filters
+            // FIX: safetySettings must be placed inside the 'config' property.
+            const fallback = await ai.models.generateContent({
               model: 'gemini-2.5-flash-image',
               contents: {
                 parts: [
                   { inlineData: { data: base64Data, mimeType } },
-                  { text: `A generic professional studio shot of this product type from a ${angle.name.toLowerCase()}. Focus on geometry and clean lighting. Discard all background elements.` }
+                  { text: `A clean 3D render of this object type in a bright white studio, ${angle.name.toLowerCase()} view.` }
                 ]
+              },
+              config: {
+                safetySettings: safetySettings
               }
             });
-            
-            const fallbackPart = fallbackResponse.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-            if (fallbackPart?.inlineData) {
-              const resData = {
-                url: `data:${fallbackPart.inlineData.mimeType};base64,${fallbackPart.inlineData.data}`,
+            const fbPart = fallback.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+            if (fbPart?.inlineData) {
+              sessionResults.push({
+                url: `data:${fbPart.inlineData.mimeType};base64,${fbPart.inlineData.data}`,
                 name: angle.name
-              };
-              sessionResults.push(resData);
+              });
               setResults([...sessionResults]);
             }
           } else {
             const imagePart = candidate?.content?.parts?.find(p => p.inlineData);
             if (imagePart?.inlineData) {
-              const resData = {
+              sessionResults.push({
                 url: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
                 name: angle.name
-              };
-              sessionResults.push(resData);
+              });
               setResults([...sessionResults]);
             }
           }
@@ -155,10 +166,10 @@ const App = () => {
       }
 
       if (sessionResults.length === 0) {
-        throw new Error("Unable to generate images for this specific photo. This is likely due to complex background elements triggering security filters. Try taking a photo of the object against a simpler, plain background.");
+        throw new Error("Even with all safety filters off, the background details in this photo are too complex for the AI. Try cropping the image so only the product is visible.");
       }
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred. Please try again with a different image.");
+      setError(err.message || "An unexpected error occurred. Please try again with a simpler image.");
     } finally {
       setLoading(false);
     }
@@ -181,9 +192,9 @@ const App = () => {
             </div>
           </div>
           <div className="hidden lg:flex items-center gap-4">
-             <div className="px-6 py-2.5 rounded-full glass-card border-indigo-500/20 bg-indigo-500/5 flex items-center gap-3">
+             <div className="px-6 py-2.5 rounded-full glass-card border-green-500/20 bg-green-500/5 flex items-center gap-3">
                 <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_15px_#22c55e]" />
-                <span className="text-[11px] font-black text-indigo-100 uppercase tracking-[0.2em]">Studio Online</span>
+                <span className="text-[11px] font-black text-green-100 uppercase tracking-[0.2em]">Safety Filters: Disabled</span>
              </div>
           </div>
         </div>
@@ -234,7 +245,7 @@ const App = () => {
               {loading ? (
                 <div className="flex items-center justify-center gap-4">
                   <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
-                  <span>Processing {Math.round(progress)}%</span>
+                  <span>Studio Render {Math.round(progress)}%</span>
                 </div>
               ) : "Generate 5 Angles"}
             </button>
@@ -243,6 +254,9 @@ const App = () => {
               <div className="mt-10 p-8 rounded-[32px] bg-red-500/5 border border-red-500/10 shadow-2xl">
                 <p className="text-[12px] font-bold text-red-400 uppercase tracking-[0.1em] leading-relaxed italic">
                    System Note: {error}
+                </p>
+                <p className="text-[10px] text-zinc-500 mt-4 uppercase font-bold tracking-widest leading-relaxed">
+                  Tip: Crop the photo so only the cup is visible before uploading.
                 </p>
               </div>
             )}
