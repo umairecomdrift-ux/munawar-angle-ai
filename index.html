@@ -9,7 +9,7 @@
   <style>
     body { 
       font-family: 'Plus Jakarta Sans', sans-serif; 
-      background-color: #030303; 
+      background-color: #020203; 
       color: #ffffff;
       margin: 0;
       padding: 0;
@@ -19,64 +19,71 @@
       min-height: 100vh;
     }
     .glass-card {
-      background: rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(40px);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      background: rgba(255, 255, 255, 0.01);
+      backdrop-filter: blur(50px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.9);
     }
     .accent-gradient {
       background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
     }
-    .text-gradient {
-      background: linear-gradient(135deg, #a5b4fc 0%, #f0abfc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .accent-border {
+      position: relative;
     }
-    @keyframes subtle-glow {
-      0%, 100% { opacity: 0.4; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(1.1); }
+    .accent-border::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(217, 70, 239, 0.5));
+      z-index: -1;
+      border-radius: inherit;
+      opacity: 0.3;
+    }
+    @keyframes floating {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
     }
     .glow-sphere {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-      filter: blur(80px);
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+      filter: blur(100px);
       z-index: -1;
-      animation: subtle-glow 10s ease-in-out infinite;
+      animation: floating 12s ease-in-out infinite;
     }
     @keyframes scanning {
-      0% { top: 0%; opacity: 0; }
-      10% { opacity: 0.8; }
-      90% { opacity: 0.8; }
-      100% { top: 100%; opacity: 0; }
+      0% { top: -10%; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { top: 110%; opacity: 0; }
     }
     .scanner-line {
       position: absolute;
       left: 0;
       width: 100%;
-      height: 2px;
+      height: 4px;
       background: linear-gradient(90deg, transparent, #818cf8, transparent);
-      box-shadow: 0 0 15px #818cf8;
-      animation: scanning 3s linear infinite;
+      box-shadow: 0 0 20px #818cf8;
+      animation: scanning 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
   </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "react": "https://esm.sh/react@^19.2.3",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
 </head>
 <body>
   <div class="glow-sphere" style="top: -200px; left: -200px;"></div>
-  <div class="glow-sphere" style="bottom: -200px; right: -200px; animation-delay: -5s;"></div>
+  <div class="glow-sphere" style="bottom: -200px; right: -200px; animation-delay: -6s;"></div>
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
